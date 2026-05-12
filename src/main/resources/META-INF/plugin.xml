@@ -1,0 +1,16 @@
+<!-- Plugin Configuration File: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <id>com.glycin.cool-cursor</id>
+    <name>Cool-cursor</name>
+    <vendor>glycin</vendor>
+
+    <description><![CDATA[
+        Adds a cool "dash" trail effect on top of IntelliJ's smooth caret animation.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <editorFactoryListener implementation="com.glycin.coolcursor.SmoothDashEditorListener"/>
+    </extensions>
+</idea-plugin>
