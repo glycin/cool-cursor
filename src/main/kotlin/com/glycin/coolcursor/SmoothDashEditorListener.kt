@@ -1,6 +1,7 @@
 package com.glycin.coolcursor
 
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.EDT
 import com.intellij.openapi.editor.Caret
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.event.CaretEvent
@@ -12,9 +13,14 @@ import com.intellij.openapi.editor.markup.HighlighterTargetArea
 import com.intellij.openapi.editor.markup.RangeHighlighter
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.Key
-import com.intellij.util.Alarm
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.util.IdentityHashMap
-import kotlin.random.Random
 
 internal class SmoothDashEditorListener : EditorFactoryListener {
 
@@ -39,7 +45,8 @@ internal class SmoothDashEditorListener : EditorFactoryListener {
 private class Attachment(private val editor: Editor, parent: Disposable) {
 
     private val states: MutableMap<Caret, SmoothDashState> = IdentityHashMap()
-    private val alarm = Alarm(Alarm.ThreadToUse.SWING_THREAD, parent)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.EDT)
+    private var renderJob: Job? = null
     private val highlighter: RangeHighlighter = installHighlighter()
 
     init {
@@ -48,21 +55,18 @@ private class Attachment(private val editor: Editor, parent: Disposable) {
                 val caret = event.caret ?: return
                 val from = editor.visualPositionToPoint2D(editor.logicalToVisualPosition(event.oldPosition))
                 val to = editor.visualPositionToPoint2D(caret.visualPosition)
-                val wasIdle = states.isEmpty()
-                val perpSign = if (Random.nextBoolean()) 1.0 else -1.0
                 states[caret] = SmoothDashState(
                     from = from,
                     to = to,
                     startNanos = System.nanoTime(),
-                    tipLengthFactor = Random.nextDouble(1.5, 2.5),
-                    tipPerpFactor = perpSign * Random.nextDouble(0.15, 0.4),
                 )
                 editor.contentComponent.repaint()
-                if (wasIdle) scheduleTick()
+                ensureRenderLoop()
             }
         }, parent)
 
         Disposer.register(parent) {
+            scope.cancel()
             if (highlighter.isValid) highlighter.dispose()
             states.clear()
         }
@@ -80,15 +84,14 @@ private class Attachment(private val editor: Editor, parent: Disposable) {
             it.customRenderer = SmoothDashCaretRenderer(states)
         }
 
-    private fun scheduleTick() {
-        if (alarm.isDisposed) return
-        alarm.addRequest(::tick, FRAME_INTERVAL_MS)
-    }
-
-    private fun tick() {
-        if (pruneFinished()) return
-        editor.contentComponent.repaint()
-        scheduleTick()
+    private fun ensureRenderLoop() {
+        if (renderJob?.isActive == true) return
+        renderJob = scope.launch {
+            while (!pruneFinished()) {
+                delay(FRAME_INTERVAL_MS)
+                editor.contentComponent.repaint()
+            }
+        }
     }
 
     private fun pruneFinished(): Boolean {
@@ -99,6 +102,6 @@ private class Attachment(private val editor: Editor, parent: Disposable) {
     }
 
     private companion object {
-        const val FRAME_INTERVAL_MS = 16
+        const val FRAME_INTERVAL_MS = 16L
     }
 }

@@ -6,25 +6,23 @@ import com.intellij.openapi.editor.markup.CustomHighlighterRenderer
 import com.intellij.openapi.editor.markup.RangeHighlighter
 import com.intellij.openapi.util.registry.Registry
 import java.awt.Color
-import java.awt.GradientPaint
 import java.awt.Graphics
 import java.awt.Graphics2D
 import java.awt.RenderingHints
 import java.awt.geom.Path2D
+import kotlin.math.abs
 import kotlin.math.pow
-import kotlin.math.sign
-import kotlin.math.sqrt
 
 internal class SmoothDashCaretRenderer(
     private val states: Map<Caret, SmoothDashState>,
 ) : CustomHighlighterRenderer {
 
-    private val triangle = Path2D.Double()
+    private val ribbon = Path2D.Double()
 
     override fun paint(editor: Editor, highlighter: RangeHighlighter, g: Graphics) {
         if (states.isEmpty()) return
 
-        val lineHeight = editor.lineHeight
+        val lineHeight = editor.lineHeight.toDouble()
         val caretDurationMs = Registry.intValue("editor.smooth.caret.duration", 120).coerceAtLeast(1)
         val curveK = Registry.doubleValue("editor.smooth.caret.curve.parametric.factor", 1.85)
         val now = System.nanoTime()
@@ -32,51 +30,36 @@ internal class SmoothDashCaretRenderer(
         val g2 = g.create() as Graphics2D
         try {
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+            g2.color = TRAIL
 
             for (state in states.values) {
                 val elapsedMs = (now - state.startNanos) / 1_000_000.0
-                val tFade = (elapsedMs / DASH_DURATION_MS).coerceIn(0.0, 1.0)
-                if (tFade >= 1.0) continue
+                if (elapsedMs >= DASH_DURATION_MS) continue
+
+                // Only ribbon along a single line; cross-line jumps just snap.
+                if (abs(state.to.y - state.from.y) > 0.5) continue
+
+                // Head rides the caret's own easing. Tail follows the same curve, delayed,
+                // so the ribbon grows out of the start point and then eats itself from the back.
+                val tHead = (elapsedMs / caretDurationMs).coerceIn(0.0, 1.0)
+                val tTail = ((elapsedMs - TAIL_DELAY_MS) / caretDurationMs).coerceIn(0.0, 1.0)
+                if (tHead - tTail < 1e-4) continue
+
+                val headFrac = parametricEase(tHead, curveK)
+                val tailFrac = parametricEase(tTail, curveK)
 
                 val dx = state.to.x - state.from.x
-                val dy = state.to.y - state.from.y
-                val len = sqrt(dx * dx + dy * dy)
-                if (len < 1.0) continue
+                val headX = state.from.x + dx * headFrac
+                val tailX = state.from.x + dx * tailFrac
+                val y = state.from.y
 
-                // Slide the base along the same curve the platform uses for its smooth caret,
-                // so the triangle stays glued to the visible (animating) caret rather than racing ahead to the logical destination.
-                val tCaret = (elapsedMs / caretDurationMs).coerceIn(0.0, 1.0)
-                val easedCaret = parametricEase(tCaret, curveK)
-                val baseX = state.from.x + dx * easedCaret
-                val baseY = state.from.y + dy * easedCaret
-
-                val unitBackX = -dx / len
-                val unitBackY = -dy / len
-                val perpX = -unitBackY
-                val perpY = unitBackX
-
-                val baseMidX = baseX
-                val baseMidY = baseY + lineHeight / 2.0
-
-                val tipDist = len * state.tipLengthFactor
-                val tipPerpDist = len * state.tipPerpFactor + lineHeight * 0.5 * state.tipPerpFactor.sign
-                val tipX = baseMidX + unitBackX * tipDist + perpX * tipPerpDist
-                val tipY = baseMidY + unitBackY * tipDist + perpY * tipPerpDist
-
-                val alpha = (1.0 - tFade).toFloat()
-                val baseColor = Color(BASE.red, BASE.green, BASE.blue, (alpha * 220).toInt().coerceIn(0, 255))
-                val tipColor = Color(BASE.red, BASE.green, BASE.blue, 0)
-                g2.paint = GradientPaint(
-                    baseMidX.toFloat(), baseMidY.toFloat(), baseColor,
-                    tipX.toFloat(), tipY.toFloat(), tipColor,
-                )
-
-                triangle.reset()
-                triangle.moveTo(baseX, baseY)
-                triangle.lineTo(baseX, baseY + lineHeight)
-                triangle.lineTo(tipX, tipY)
-                triangle.closePath()
-                g2.fill(triangle)
+                ribbon.reset()
+                ribbon.moveTo(tailX, y)
+                ribbon.lineTo(tailX, y + lineHeight)
+                ribbon.lineTo(headX, y + lineHeight)
+                ribbon.lineTo(headX, y)
+                ribbon.closePath()
+                g2.fill(ribbon)
             }
         } finally {
             g2.dispose()
@@ -92,6 +75,7 @@ internal class SmoothDashCaretRenderer(
     }
 
     private companion object {
-        val BASE = Color(0x8B, 0x5C, 0xF6)
+        const val TAIL_DELAY_MS = 90.0
+        val TRAIL = Color(0x8B, 0x5C, 0xF6)
     }
 }
