@@ -37,10 +37,10 @@ internal object TrailGeometry {
         p0x: Double, p0y: Double,
         p1x: Double, p1y: Double,
     ): RibbonEndpoints {
-        val tailX = (1 - a) * p0x + a * p1x
-        val tailY = (1 - a) * p0y + a * p1y
-        val headX = (1 - b) * p0x + b * p1x
-        val headY = (1 - b) * p0y + b * p1y
+        val tailX = MathUtils.lerp(p0x, p1x, a)
+        val tailY = MathUtils.lerp(p0y, p1y, a)
+        val headX = MathUtils.lerp(p0x, p1x, b)
+        val headY = MathUtils.lerp(p0y, p1y, b)
         ribbon.moveTo(tailX, tailY)
         ribbon.lineTo(headX, headY)
         return RibbonEndpoints(tailX, tailY, headX, headY)
@@ -53,10 +53,10 @@ internal object TrailGeometry {
         cpx: Double, cpy: Double,
         p1x: Double, p1y: Double,
     ): RibbonEndpoints {
-        val tailX = (1 - a) * (1 - a) * p0x + 2 * (1 - a) * a * cpx + a * a * p1x
-        val tailY = (1 - a) * (1 - a) * p0y + 2 * (1 - a) * a * cpy + a * a * p1y
-        val headX = (1 - b) * (1 - b) * p0x + 2 * (1 - b) * b * cpx + b * b * p1x
-        val headY = (1 - b) * (1 - b) * p0y + 2 * (1 - b) * b * cpy + b * b * p1y
+        val tailX = MathUtils.quadBezier(p0x, cpx, p1x, a)
+        val tailY = MathUtils.quadBezier(p0y, cpy, p1y, a)
+        val headX = MathUtils.quadBezier(p0x, cpx, p1x, b)
+        val headY = MathUtils.quadBezier(p0y, cpy, p1y, b)
         val subCx = (1 - a) * (1 - b) * p0x + ((1 - a) * b + a * (1 - b)) * cpx + a * b * p1x
         val subCy = (1 - a) * (1 - b) * p0y + ((1 - a) * b + a * (1 - b)) * cpy + a * b * p1y
         ribbon.moveTo(tailX, tailY)
@@ -77,8 +77,8 @@ internal object TrailGeometry {
         var lastX = 0.0; var lastY = 0.0
         for (i in 0..TrailTuning.SINE_SAMPLES) {
             val t = a + (i.toDouble() / TrailTuning.SINE_SAMPLES) * span
-            val cx = (1 - t) * p0x + t * p1x
-            val cy = (1 - t) * p0y + t * p1y
+            val cx = MathUtils.lerp(p0x, p1x, t)
+            val cy = MathUtils.lerp(p0y, p1y, t)
             val wave = TrailTuning.SINE_AMPLITUDE_PX * sin(waveScale * t)
             val x = cx + perpX * wave
             val y = cy + perpY * wave

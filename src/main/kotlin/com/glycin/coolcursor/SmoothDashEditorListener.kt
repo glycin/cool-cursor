@@ -23,7 +23,6 @@ import kotlinx.coroutines.launch
 import java.awt.geom.Point2D
 import java.util.IdentityHashMap
 import kotlin.math.abs
-import kotlin.math.sqrt
 
 private val ATTACHMENT_KEY = Key.create<Disposable>("cool-cursor.smoothDashAttachment")
 
@@ -68,7 +67,7 @@ private class Attachment(private val editor: Editor, parent: Disposable) {
                 val control = Point2D.Double(midX - dy * TrailTuning.BOW, midY + dx * TrailTuning.BOW)
 
                 val userShape = coolCursorSettings().trailShape
-                val chordLen = sqrt(dx * dx + dy * dy)
+                val chordLen = MathUtils.chordLength(dx, dy)
                 val resolved = when (userShape) {
                     TrailShape.RANDOM -> {
                         val pick = TrailTuning.RANDOMIZABLE_SHAPES.random()

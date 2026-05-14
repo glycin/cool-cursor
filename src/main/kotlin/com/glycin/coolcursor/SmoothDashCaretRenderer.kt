@@ -15,7 +15,6 @@ import java.awt.RenderingHints
 import java.awt.Stroke
 import java.awt.geom.Path2D
 import kotlin.math.pow
-import kotlin.math.sqrt
 
 internal class SmoothDashCaretRenderer(
     private val states: Map<Caret, SmoothDashState>,
@@ -72,7 +71,7 @@ internal class SmoothDashCaretRenderer(
 
                 val dxC = p1.x - p0.x
                 val dyC = p1.y - p0.y
-                val chordLen = sqrt(dxC * dxC + dyC * dyC)
+                val chordLen = MathUtils.chordLength(dxC, dyC)
                 val perpX = -dyC / chordLen
                 val perpY = dxC / chordLen
                 val waveScale = if (state.renderShape == TrailShape.SINE) {
