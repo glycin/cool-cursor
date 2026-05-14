@@ -5,6 +5,7 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.markup.CustomHighlighterRenderer
 import com.intellij.openapi.editor.markup.RangeHighlighter
 import com.intellij.openapi.util.registry.Registry
+import com.intellij.ui.ColorUtil
 import java.awt.BasicStroke
 import java.awt.Color
 import java.awt.Graphics
@@ -38,7 +39,7 @@ internal class SmoothDashCaretRenderer(
             null
         }
         val haloColor: Color? = if (snapshot.trailGlow) {
-            Color(snapshot.glowColor.red, snapshot.glowColor.green, snapshot.glowColor.blue, TrailTuning.HALO_ALPHA)
+            ColorUtil.toAlpha(snapshot.glowColor, TrailTuning.HALO_ALPHA)
         } else {
             null
         }

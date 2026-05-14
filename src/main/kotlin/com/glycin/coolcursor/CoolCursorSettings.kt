@@ -6,6 +6,7 @@ import com.intellij.openapi.components.SimplePersistentStateComponent
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import com.intellij.openapi.components.service
+import com.intellij.ui.JBColor
 import java.awt.Color
 
 internal const val DEFAULT_TRAIL_RGB = 0x8B5CF6
@@ -50,15 +51,15 @@ internal class CoolCursorSettings : SimplePersistentStateComponent<CoolCursorSet
     }
 
     var headColor: Color
-        get() = Color(state.headColorRgb)
+        get() = JBColor(state.headColorRgb, state.headColorRgb)
         set(value) { state.headColorRgb = value.rgb24 }
 
     var tailColor: Color
-        get() = Color(state.tailColorRgb)
+        get() = JBColor(state.tailColorRgb, state.tailColorRgb)
         set(value) { state.tailColorRgb = value.rgb24 }
 
     var glowColor: Color
-        get() = Color(state.glowColorRgb)
+        get() = JBColor(state.glowColorRgb, state.glowColorRgb)
         set(value) { state.glowColorRgb = value.rgb24 }
 
     var trailThickness: Float
@@ -78,9 +79,9 @@ internal class CoolCursorSettings : SimplePersistentStateComponent<CoolCursorSet
         set(value) { state.trailShape = value }
 
     fun snapshot(): RenderSnapshot = RenderSnapshot(
-        headColor = Color(state.headColorRgb),
-        tailColor = Color(state.tailColorRgb),
-        glowColor = Color(state.glowColorRgb),
+        headColor = JBColor(state.headColorRgb, state.headColorRgb),
+        tailColor = JBColor(state.tailColorRgb, state.tailColorRgb),
+        glowColor = JBColor(state.glowColorRgb, state.glowColorRgb),
         trailThickness = state.trailThickness,
         trailGlow = state.trailGlow,
         lineCount = state.lineCount.coerceIn(1, 3),
