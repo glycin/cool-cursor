@@ -1,14 +1,29 @@
 package com.glycin.coolcursor
 
 import com.intellij.openapi.options.Configurable
+import com.intellij.openapi.ui.ComboBox
 import com.intellij.ui.ColorPanel
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.dsl.builder.selected
+import com.intellij.ui.layout.selected
 import java.awt.Color
+import javax.swing.DefaultComboBoxModel
 import javax.swing.JComponent
 import javax.swing.JSpinner
 import javax.swing.SpinnerNumberModel
+
+private enum class LineCountOption(val count: Int, private val label: String) {
+    SINGLE(1, "Single"),
+    AKIRA(2, "Top + bottom (Akira)"),
+    TRIPLE(3, "Top + middle + bottom");
+
+    override fun toString(): String = label
+
+    companion object {
+        fun forCount(count: Int): LineCountOption = entries.firstOrNull { it.count == count } ?: SINGLE
+    }
+}
 
 internal class CoolCursorConfigurable : Configurable {
 
@@ -16,6 +31,7 @@ internal class CoolCursorConfigurable : Configurable {
     private val tailColorPanel = ColorPanel()
     private val glowColorPanel = ColorPanel()
     private val thicknessSpinner = JSpinner(SpinnerNumberModel(DEFAULT_THICKNESS.toDouble(), 1.0, 50.0, 0.5))
+    private val lineCountCombo = ComboBox(DefaultComboBoxModel(LineCountOption.entries.toTypedArray()))
     private val glowCheckbox = JBCheckBox("Glow")
 
     override fun getDisplayName(): String = "Cool Cursor"
@@ -25,6 +41,9 @@ internal class CoolCursorConfigurable : Configurable {
         return panel {
             row("Trail thickness:") {
                 cell(thicknessSpinner)
+            }
+            row("Number of lines:") {
+                cell(lineCountCombo)
             }
             row("Head color:") {
                 cell(headColorPanel)
@@ -47,6 +66,7 @@ internal class CoolCursorConfigurable : Configurable {
             || tailColorPanel.differsFrom(s.tailColor)
             || glowColorPanel.differsFrom(s.glowColor)
             || spinnerThickness() != s.trailThickness
+            || comboLineCount() != s.lineCount
             || glowCheckbox.isSelected != s.trailGlow
     }
 
@@ -56,6 +76,7 @@ internal class CoolCursorConfigurable : Configurable {
         tailColorPanel.selectedColor?.let { settings.tailColor = it }
         glowColorPanel.selectedColor?.let { settings.glowColor = it }
         settings.trailThickness = spinnerThickness()
+        settings.lineCount = comboLineCount()
         settings.trailGlow = glowCheckbox.isSelected
     }
 
@@ -69,10 +90,13 @@ internal class CoolCursorConfigurable : Configurable {
         tailColorPanel.selectedColor = s.tailColor
         glowColorPanel.selectedColor = s.glowColor
         thicknessSpinner.value = s.trailThickness.toDouble()
+        lineCountCombo.selectedItem = LineCountOption.forCount(s.lineCount)
         glowCheckbox.isSelected = s.trailGlow
     }
 
     private fun spinnerThickness(): Float = (thicknessSpinner.value as Number).toFloat()
+
+    private fun comboLineCount(): Int = (lineCountCombo.selectedItem as? LineCountOption)?.count ?: DEFAULT_LINE_COUNT
 
     private fun ColorPanel.differsFrom(other: Color): Boolean {
         val rgb = selectedColor?.rgb24 ?: return false

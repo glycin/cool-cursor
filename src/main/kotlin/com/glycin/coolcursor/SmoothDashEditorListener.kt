@@ -114,7 +114,8 @@ private class Attachment(private val editor: Editor, parent: Disposable) {
     private fun repaintState(state: SmoothDashState) {
         val settings = coolCursorSettings()
         val haloHalf = if (settings.trailGlow) HALO_EXTRA / 2f else 0f
-        val pad = (settings.trailThickness / 2f + haloHalf + 2f).toInt()
+        val laneHalf = if (settings.lineCount > 1) editor.lineHeight / 2f else 0f
+        val pad = (settings.trailThickness / 2f + haloHalf + laneHalf + 2f).toInt()
         val minX = minOf(state.from.x, state.to.x, state.control.x).toInt() - pad
         val maxX = maxOf(state.from.x, state.to.x, state.control.x).toInt() + pad
         val minY = minOf(state.from.y, state.to.y, state.control.y).toInt() - pad

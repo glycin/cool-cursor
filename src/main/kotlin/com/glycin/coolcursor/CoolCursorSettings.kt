@@ -11,6 +11,7 @@ import java.awt.Color
 internal const val DEFAULT_TRAIL_RGB = 0x8B5CF6
 internal const val DEFAULT_THICKNESS = 4f
 internal const val DEFAULT_GLOW = true
+internal const val DEFAULT_LINE_COUNT = 1
 
 internal val Color.rgb24: Int get() = rgb and 0xFFFFFF
 
@@ -26,6 +27,7 @@ internal class CoolCursorSettings : SimplePersistentStateComponent<CoolCursorSet
         var glowColorRgb: Int by property(DEFAULT_TRAIL_RGB)
         var trailThickness: Float by property(DEFAULT_THICKNESS)
         var trailGlow: Boolean by property(DEFAULT_GLOW)
+        var lineCount: Int by property(DEFAULT_LINE_COUNT)
     }
 
     @Volatile private var cachedHead: Color = Color(state.headColorRgb)
@@ -73,5 +75,11 @@ internal class CoolCursorSettings : SimplePersistentStateComponent<CoolCursorSet
         get() = state.trailGlow
         set(value) {
             state.trailGlow = value
+        }
+
+    var lineCount: Int
+        get() = state.lineCount.coerceIn(1, 3)
+        set(value) {
+            state.lineCount = value.coerceIn(1, 3)
         }
 }

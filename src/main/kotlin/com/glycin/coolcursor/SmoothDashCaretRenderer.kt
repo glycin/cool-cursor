@@ -14,6 +14,7 @@ import java.awt.RenderingHints
 import java.awt.Stroke
 import java.awt.geom.Path2D
 import kotlin.math.pow
+import kotlin.math.sqrt
 
 internal const val HALO_EXTRA = 6f
 
@@ -49,6 +50,12 @@ internal class SmoothDashCaretRenderer(
             null
         }
         val colorsMatch = headColor.rgb24 == tailColor.rgb24
+        val offsets: DoubleArray = when (settings.lineCount) {
+            2 -> AKIRA_OFFSETS
+            3 -> TRIPLE_OFFSETS
+            else -> SINGLE_OFFSETS
+        }
+        val offsetScale = editor.lineHeight.toDouble()
 
         val g2 = g.create() as Graphics2D
         try {
@@ -69,37 +76,51 @@ internal class SmoothDashCaretRenderer(
                 val cp = state.control
                 val p1 = state.to
 
-                val tailX = (1 - a) * (1 - a) * p0.x + 2 * (1 - a) * a * cp.x + a * a * p1.x
-                val tailY = (1 - a) * (1 - a) * p0.y + 2 * (1 - a) * a * cp.y + a * a * p1.y
-                val headX = (1 - b) * (1 - b) * p0.x + 2 * (1 - b) * b * cp.x + b * b * p1.x
-                val headY = (1 - b) * (1 - b) * p0.y + 2 * (1 - b) * b * cp.y + b * b * p1.y
-                val subCx = (1 - a) * (1 - b) * p0.x + ((1 - a) * b + a * (1 - b)) * cp.x + a * b * p1.x
-                val subCy = (1 - a) * (1 - b) * p0.y + ((1 - a) * b + a * (1 - b)) * cp.y + a * b * p1.y
+                val dxC = p1.x - p0.x
+                val dyC = p1.y - p0.y
+                val chordLen = sqrt(dxC * dxC + dyC * dyC)
+                val perpX = -dyC / chordLen
+                val perpY = dxC / chordLen
 
-                ribbon.reset()
-                ribbon.moveTo(tailX, tailY)
-                ribbon.quadTo(subCx, subCy, headX, headY)
+                for (off in offsets) {
+                    val ox = perpX * off * offsetScale
+                    val oy = perpY * off * offsetScale
+                    val p0x = p0.x + ox; val p0y = p0.y + oy
+                    val cpx = cp.x + ox; val cpy = cp.y + oy
+                    val p1x = p1.x + ox; val p1y = p1.y + oy
 
-                if (glow) {
-                    g2.paint = haloColor
-                    g2.stroke = haloStroke
+                    val tailX = (1 - a) * (1 - a) * p0x + 2 * (1 - a) * a * cpx + a * a * p1x
+                    val tailY = (1 - a) * (1 - a) * p0y + 2 * (1 - a) * a * cpy + a * a * p1y
+                    val headX = (1 - b) * (1 - b) * p0x + 2 * (1 - b) * b * cpx + b * b * p1x
+                    val headY = (1 - b) * (1 - b) * p0y + 2 * (1 - b) * b * cpy + b * b * p1y
+                    val subCx = (1 - a) * (1 - b) * p0x + ((1 - a) * b + a * (1 - b)) * cpx + a * b * p1x
+                    val subCy = (1 - a) * (1 - b) * p0y + ((1 - a) * b + a * (1 - b)) * cpy + a * b * p1y
+
+                    ribbon.reset()
+                    ribbon.moveTo(tailX, tailY)
+                    ribbon.quadTo(subCx, subCy, headX, headY)
+
+                    if (glow) {
+                        g2.paint = haloColor
+                        g2.stroke = haloStroke
+                        g2.draw(ribbon)
+                    }
+
+                    val dxLine = headX - tailX
+                    val dyLine = headY - tailY
+                    if (!colorsMatch && dxLine * dxLine + dyLine * dyLine >= MIN_GRADIENT_LEN_SQ) {
+                        g2.paint = LinearGradientPaint(
+                            tailX.toFloat(), tailY.toFloat(),
+                            headX.toFloat(), headY.toFloat(),
+                            GRADIENT_FRACTIONS,
+                            arrayOf(tailColor, headColor),
+                        )
+                    } else {
+                        g2.paint = headColor
+                    }
+                    g2.stroke = coreStroke
                     g2.draw(ribbon)
                 }
-
-                val dxLine = headX - tailX
-                val dyLine = headY - tailY
-                if (!colorsMatch && dxLine * dxLine + dyLine * dyLine >= MIN_GRADIENT_LEN_SQ) {
-                    g2.paint = LinearGradientPaint(
-                        tailX.toFloat(), tailY.toFloat(),
-                        headX.toFloat(), headY.toFloat(),
-                        GRADIENT_FRACTIONS,
-                        arrayOf(tailColor, headColor),
-                    )
-                } else {
-                    g2.paint = headColor
-                }
-                g2.stroke = coreStroke
-                g2.draw(ribbon)
             }
         } finally {
             g2.dispose()
@@ -114,5 +135,8 @@ internal class SmoothDashCaretRenderer(
         const val HALO_ALPHA = 90
         const val MIN_GRADIENT_LEN_SQ = 1.0
         val GRADIENT_FRACTIONS = floatArrayOf(0f, 1f)
+        val SINGLE_OFFSETS = doubleArrayOf(0.0)
+        val AKIRA_OFFSETS = doubleArrayOf(-0.5, 0.5)
+        val TRIPLE_OFFSETS = doubleArrayOf(-0.5, 0.0, 0.5)
     }
 }
