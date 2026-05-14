@@ -15,7 +15,7 @@ import javax.swing.SpinnerNumberModel
 
 private enum class LineCountOption(val count: Int, private val label: String) {
     SINGLE(1, "Single"),
-    AKIRA(2, "Top + bottom (Akira)"),
+    AKIRA(2, "Top + bottom"),
     TRIPLE(3, "Top + middle + bottom");
 
     override fun toString(): String = label
@@ -35,7 +35,7 @@ internal class CoolCursorConfigurable : Configurable {
     private val trailShapeCombo = ComboBox(DefaultComboBoxModel(TrailShape.entries.toTypedArray()))
     private val glowCheckbox = JBCheckBox("Glow")
 
-    override fun getDisplayName(): String = "Cool Cursor"
+    override fun getDisplayName(): String = "Smooth Caret Trail"
 
     override fun createComponent(): JComponent {
         loadFromSettings()

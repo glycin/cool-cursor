@@ -1,12 +1,8 @@
 <!-- Plugin Configuration File: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
     <id>com.glycin.cool-cursor</id>
-    <name>Cool-cursor</name>
+    <name>Smooth Caret Trail</name>
     <vendor>glycin</vendor>
-
-    <description><![CDATA[
-        Adds a cool "dash" trail effect on top of IntelliJ's smooth caret animation.
-    ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
 
@@ -15,7 +11,7 @@
         <applicationService serviceImplementation="com.glycin.coolcursor.CoolCursorSettings"/>
         <applicationConfigurable
                 id="com.glycin.coolcursor.settings"
-                displayName="Cool Cursor"
+                displayName="Smooth Caret Trail"
                 instance="com.glycin.coolcursor.CoolCursorConfigurable"/>
     </extensions>
 </idea-plugin>

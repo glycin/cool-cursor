@@ -1,16 +1,24 @@
-# Cool Caret
+# Smooth Caret Trail
 
-A small IntelliJ plugin that leaves a glowing violet trail behind your caret. Think Kaneda's slide across Neo Tokyo, or a lightcycle carving a ribbon along the Grid.
+A small IntelliJ plugin that leaves a glowing trail behind your caret. Think Kaneda's slide across Neo Tokyo, or a lightcycle carving a ribbon along the Grid.
 
 ## What it does
 
-When your caret jumps to a new position, a translucent wedge chases it across the editor. The trail rides the same easing curve as the platform's smooth caret, so it stays glued to the moving cursor rather than racing ahead to the destination. It fades out cleanly in about 350 ms.
+Every caret move spawns an animated streak from the old position to the new one. The head dashes ahead while the tail hangs back, stretching the line; the tail then catches up and the streak collapses into the caret. The dash rides the same easing curve as IntelliJ's native smooth caret movement.
 
-Each dash carries a touch of random variation in length and angle, so motion never looks mechanical.
+## Customize
+
+Configure under *Settings → Smooth Caret Trail*:
+
+* **Trail shape** — straight line, bezier curve, sine wave (long moves only), or random per dash
+* **Number of lines** — single, top + bottom, or top + middle + bottom
+* **Head and tail colors** — set both for a gradient, or match them for a flat color
+* **Glow** — optional halo with its own color
+* **Thickness** — 1 to 50 px
 
 ## Requirements
 
-IntelliJ Platform 2024.1 or newer, with smooth caret movement enabled under Settings, Editor, General, Appearance, "Use smooth caret movement".
+IntelliJ Platform 2026.1 or newer. Pairs best with smooth caret movement enabled under *Settings → Editor → General → Appearance → "Use smooth caret movement"*.
 
 ## Build
 
@@ -20,10 +28,14 @@ IntelliJ Platform 2024.1 or newer, with smooth caret movement enabled under Sett
 
 ## Tuning
 
-Two IntelliJ Registry keys shape the animation. The renderer reads both at paint time, so edits apply on the next caret move:
+The renderer reads two IntelliJ Registry keys at paint time, so edits apply on the next caret move:
 
-* `editor.smooth.caret.duration` sets how many milliseconds the caret takes to slide
+* `editor.smooth.caret.duration` sets the per-caret slide duration in milliseconds
 * `editor.smooth.caret.curve.parametric.factor` sets the easing shape
+
+## Marketplace description
+
+The text shown on the JetBrains Marketplace lives in [`MARKETPLACE_DESCRIPTION.html`](./MARKETPLACE_DESCRIPTION.html). It's read at build time by `pluginConfiguration.description` in `build.gradle.kts` and injected into the shipped `plugin.xml`.
 
 ## License
 

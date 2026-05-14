@@ -28,6 +28,10 @@ dependencies {
 
 intellijPlatform {
     pluginConfiguration {
+        description = providers.fileContents(layout.projectDirectory.file("MARKETPLACE_DESCRIPTION.html"))
+            .asText
+            .map { it.trim() }
+
         ideaVersion {
             sinceBuild = "261"
             untilBuild = "999.*"
