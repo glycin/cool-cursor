@@ -24,8 +24,6 @@ import java.awt.geom.Point2D
 import java.util.IdentityHashMap
 import kotlin.math.abs
 import kotlin.math.sqrt
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
 
 private val ATTACHMENT_KEY = Key.create<Disposable>("cool-cursor.smoothDashAttachment")
 
@@ -55,7 +53,7 @@ private class Attachment(private val editor: Editor, parent: Disposable) {
     init {
         editor.caretModel.addCaretListener(object : CaretListener {
             override fun caretPositionChanged(event: CaretEvent) {
-                val caret = event.caret ?: return
+                val caret = event.caret
                 val rawFrom = editor.visualPositionToPoint2D(editor.logicalToVisualPosition(event.oldPosition))
                 val rawTo = editor.visualPositionToPoint2D(caret.visualPosition)
                 val half = editor.lineHeight / 2.0
@@ -67,22 +65,22 @@ private class Attachment(private val editor: Editor, parent: Disposable) {
                 val dy = to.y - from.y
                 val midX = (from.x + to.x) / 2.0
                 val midY = (from.y + to.y) / 2.0
-                val control = Point2D.Double(midX - dy * BOW, midY + dx * BOW)
+                val control = Point2D.Double(midX - dy * TrailTuning.BOW, midY + dx * TrailTuning.BOW)
 
                 val userShape = coolCursorSettings().trailShape
                 val chordLen = sqrt(dx * dx + dy * dy)
                 val resolved = when (userShape) {
                     TrailShape.RANDOM -> {
-                        val pick = RANDOMIZABLE_SHAPES.random()
-                        if (pick == TrailShape.SINE && chordLen < SINE_THRESHOLD_PX) TrailShape.CURVE else pick
+                        val pick = TrailTuning.RANDOMIZABLE_SHAPES.random()
+                        if (pick == TrailShape.SINE && chordLen < TrailTuning.SINE_THRESHOLD_PX) TrailShape.CURVE else pick
                     }
-                    TrailShape.SINE -> if (chordLen < SINE_THRESHOLD_PX) TrailShape.CURVE else TrailShape.SINE
+                    TrailShape.SINE -> if (chordLen < TrailTuning.SINE_THRESHOLD_PX) TrailShape.CURVE else TrailShape.SINE
                     else -> userShape
                 }
 
                 val state = SmoothDashState(from, to, control, resolved, System.nanoTime())
                 states[caret] = state
-                repaintState(state)
+                repaintState(state, coolCursorSettings().snapshot())
                 ensureRenderLoop()
             }
         }, parent)
@@ -110,39 +108,29 @@ private class Attachment(private val editor: Editor, parent: Disposable) {
         if (renderJob?.isActive == true) return
         renderJob = scope.launch {
             while (!pruneFinished()) {
-                delay(FRAME_INTERVAL)
-                for (state in states.values) repaintState(state)
+                delay(TrailTuning.FRAME_INTERVAL)
+                val snapshot = coolCursorSettings().snapshot()
+                for (state in states.values) repaintState(state, snapshot)
             }
         }
     }
 
     private fun pruneFinished(): Boolean {
-        val durationNanos = DASH_DURATION_MS.toLong() * 1_000_000L
+        val durationNanos = TrailTuning.DASH_DURATION_MS.toLong() * 1_000_000L
         val now = System.nanoTime()
         states.entries.removeIf { now - it.value.startNanos > durationNanos }
         return states.isEmpty()
     }
 
-    private fun repaintState(state: SmoothDashState) {
-        val settings = coolCursorSettings()
-        val haloHalf = if (settings.trailGlow) HALO_EXTRA / 2f else 0f
-        val laneHalf = if (settings.lineCount > 1) editor.lineHeight / 2f else 0f
-        val waveAmp = if (state.renderShape == TrailShape.SINE) SINE_AMPLITUDE_PX else 0f
-        val pad = (settings.trailThickness / 2f + haloHalf + laneHalf + waveAmp + 2f).toInt()
+    private fun repaintState(state: SmoothDashState, snapshot: RenderSnapshot) {
+        val haloHalf = if (snapshot.trailGlow) TrailTuning.HALO_EXTRA / 2f else 0f
+        val laneHalf = if (snapshot.lineCount > 1) editor.lineHeight / 2f else 0f
+        val waveAmp = if (state.renderShape == TrailShape.SINE) TrailTuning.SINE_AMPLITUDE_PX else 0f
+        val pad = (snapshot.trailThickness / 2f + haloHalf + laneHalf + waveAmp + 2f).toInt()
         val minX = minOf(state.from.x, state.to.x, state.control.x).toInt() - pad
         val maxX = maxOf(state.from.x, state.to.x, state.control.x).toInt() + pad
         val minY = minOf(state.from.y, state.to.y, state.control.y).toInt() - pad
         val maxY = maxOf(state.from.y, state.to.y, state.control.y).toInt() + pad
         editor.contentComponent.repaint(minX, minY, maxX - minX, maxY - minY)
     }
-
-    private companion object {
-        val FRAME_INTERVAL: Duration = 16.milliseconds
-        // Control-point offset as a fraction of chord length perpendicular to the chord.
-        // 0 = straight line; ~0.3 = pronounced arc. 0.18 is a subtle swoosh.
-        const val BOW = 0.18
-        const val SINE_THRESHOLD_PX = 100.0
-        val RANDOMIZABLE_SHAPES = arrayOf(TrailShape.STRAIGHT, TrailShape.CURVE, TrailShape.SINE)
-    }
 }
-

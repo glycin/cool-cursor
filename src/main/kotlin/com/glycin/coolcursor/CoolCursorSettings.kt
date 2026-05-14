@@ -26,6 +26,15 @@ internal val Color.rgb24: Int get() = rgb and 0xFFFFFF
 
 internal fun coolCursorSettings(): CoolCursorSettings = service()
 
+internal data class RenderSnapshot(
+    val headColor: Color,
+    val tailColor: Color,
+    val glowColor: Color,
+    val trailThickness: Float,
+    val trailGlow: Boolean,
+    val lineCount: Int,
+)
+
 @Service(Service.Level.APP)
 @State(name = "CoolCursorSettings", storages = [Storage("cool-cursor.xml")])
 internal class CoolCursorSettings : SimplePersistentStateComponent<CoolCursorSettings.State>(State()) {
@@ -40,62 +49,40 @@ internal class CoolCursorSettings : SimplePersistentStateComponent<CoolCursorSet
         var trailShape: TrailShape by enum(TrailShape.CURVE)
     }
 
-    @Volatile private var cachedHead: Color = Color(state.headColorRgb)
-    @Volatile private var cachedTail: Color = Color(state.tailColorRgb)
-    @Volatile private var cachedGlow: Color = Color(state.glowColorRgb)
-
-    override fun loadState(loaded: State) {
-        super.loadState(loaded)
-        cachedHead = Color(state.headColorRgb)
-        cachedTail = Color(state.tailColorRgb)
-        cachedGlow = Color(state.glowColorRgb)
-    }
-
     var headColor: Color
-        get() = cachedHead
-        set(value) {
-            val rgb = value.rgb24
-            state.headColorRgb = rgb
-            cachedHead = Color(rgb)
-        }
+        get() = Color(state.headColorRgb)
+        set(value) { state.headColorRgb = value.rgb24 }
 
     var tailColor: Color
-        get() = cachedTail
-        set(value) {
-            val rgb = value.rgb24
-            state.tailColorRgb = rgb
-            cachedTail = Color(rgb)
-        }
+        get() = Color(state.tailColorRgb)
+        set(value) { state.tailColorRgb = value.rgb24 }
 
     var glowColor: Color
-        get() = cachedGlow
-        set(value) {
-            val rgb = value.rgb24
-            state.glowColorRgb = rgb
-            cachedGlow = Color(rgb)
-        }
+        get() = Color(state.glowColorRgb)
+        set(value) { state.glowColorRgb = value.rgb24 }
 
     var trailThickness: Float
         get() = state.trailThickness
-        set(value) {
-            state.trailThickness = value
-        }
+        set(value) { state.trailThickness = value }
 
     var trailGlow: Boolean
         get() = state.trailGlow
-        set(value) {
-            state.trailGlow = value
-        }
+        set(value) { state.trailGlow = value }
 
     var lineCount: Int
         get() = state.lineCount.coerceIn(1, 3)
-        set(value) {
-            state.lineCount = value.coerceIn(1, 3)
-        }
+        set(value) { state.lineCount = value.coerceIn(1, 3) }
 
     var trailShape: TrailShape
         get() = state.trailShape
-        set(value) {
-            state.trailShape = value
-        }
+        set(value) { state.trailShape = value }
+
+    fun snapshot(): RenderSnapshot = RenderSnapshot(
+        headColor = Color(state.headColorRgb),
+        tailColor = Color(state.tailColorRgb),
+        glowColor = Color(state.glowColorRgb),
+        trailThickness = state.trailThickness,
+        trailGlow = state.trailGlow,
+        lineCount = state.lineCount.coerceIn(1, 3),
+    )
 }
