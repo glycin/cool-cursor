@@ -10,6 +10,7 @@
         <editorFactoryListener implementation="com.glycin.coolcursor.SmoothDashEditorListener"/>
         <applicationService serviceImplementation="com.glycin.coolcursor.CoolCursorSettings"/>
         <applicationConfigurable
+                parentId="editor"
                 id="com.glycin.coolcursor.settings"
                 displayName="Smooth Caret Trail"
                 instance="com.glycin.coolcursor.CoolCursorConfigurable"/>

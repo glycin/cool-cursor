@@ -8,7 +8,7 @@ Every caret move spawns an animated streak from the old position to the new one.
 
 ## Customize
 
-Configure under *Settings → Smooth Caret Trail*:
+Configure under *Settings → Editor → Smooth Caret Trail*:
 
 * **Trail shape** — straight line, bezier curve, sine wave (long moves only), or random per dash
 * **Number of lines** — single, top + bottom, or top + middle + bottom
