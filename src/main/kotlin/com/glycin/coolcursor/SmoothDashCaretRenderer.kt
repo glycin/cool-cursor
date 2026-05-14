@@ -67,7 +67,7 @@ internal class SmoothDashCaretRenderer(
                 val elapsedMs = (now - state.startNanos) / 1_000_000.0
                 if (elapsedMs >= DASH_DURATION_MS) continue
 
-                val tHead = (elapsedMs / caretDurationMs).coerceIn(0.0, 1.0)
+                val tHead = ((elapsedMs - HEAD_DELAY_MS) / caretDurationMs).coerceIn(0.0, 1.0)
                 val tTail = ((elapsedMs - TAIL_DELAY_MS) / caretDurationMs).coerceIn(0.0, 1.0)
                 if (tHead - tTail < 1e-4) continue
 
@@ -178,7 +178,8 @@ internal class SmoothDashCaretRenderer(
     private fun parametricEase(t: Double): Double = 1.0 - (1.0 - t.pow(easeA)).pow(easeB)
 
     private companion object {
-        const val TAIL_DELAY_MS = 90.0
+        const val HEAD_DELAY_MS = 20.0
+        const val TAIL_DELAY_MS = 150.0
         const val HALO_ALPHA = 90
         const val MIN_GRADIENT_LEN_SQ = 1.0
         const val SINE_CYCLES_PER_PX = 1f / 30f

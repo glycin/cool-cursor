@@ -70,9 +70,13 @@ private class Attachment(private val editor: Editor, parent: Disposable) {
                 val control = Point2D.Double(midX - dy * BOW, midY + dx * BOW)
 
                 val userShape = coolCursorSettings().trailShape
+                val chordLen = sqrt(dx * dx + dy * dy)
                 val resolved = when (userShape) {
-                    TrailShape.RANDOM -> RANDOMIZABLE_SHAPES.random()
-                    TrailShape.SINE -> if (sqrt(dx * dx + dy * dy) < SINE_THRESHOLD_PX) TrailShape.CURVE else TrailShape.SINE
+                    TrailShape.RANDOM -> {
+                        val pick = RANDOMIZABLE_SHAPES.random()
+                        if (pick == TrailShape.SINE && chordLen < SINE_THRESHOLD_PX) TrailShape.CURVE else pick
+                    }
+                    TrailShape.SINE -> if (chordLen < SINE_THRESHOLD_PX) TrailShape.CURVE else TrailShape.SINE
                     else -> userShape
                 }
 
@@ -137,7 +141,7 @@ private class Attachment(private val editor: Editor, parent: Disposable) {
         // Control-point offset as a fraction of chord length perpendicular to the chord.
         // 0 = straight line; ~0.3 = pronounced arc. 0.18 is a subtle swoosh.
         const val BOW = 0.18
-        const val SINE_THRESHOLD_PX = 30.0
+        const val SINE_THRESHOLD_PX = 100.0
         val RANDOMIZABLE_SHAPES = arrayOf(TrailShape.STRAIGHT, TrailShape.CURVE, TrailShape.SINE)
     }
 }
