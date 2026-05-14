@@ -5,9 +5,12 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.markup.CustomHighlighterRenderer
 import com.intellij.openapi.editor.markup.RangeHighlighter
 import com.intellij.openapi.util.registry.Registry
+import java.awt.BasicStroke
+import java.awt.Color
 import java.awt.Graphics
 import java.awt.Graphics2D
 import java.awt.RenderingHints
+import java.awt.Stroke
 import java.awt.geom.Path2D
 import kotlin.math.abs
 import kotlin.math.pow
@@ -25,22 +28,19 @@ internal class SmoothDashCaretRenderer(
 
         val lineHeight = editor.lineHeight.toDouble()
         val now = System.nanoTime()
-        val trailColor = coolCursorSettings().trailColor
+        val settings = coolCursorSettings()
+        val trailColor = settings.trailColor
+        val style = settings.trailStyle
 
         val g2 = g.create() as Graphics2D
         try {
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-            g2.color = trailColor
 
             for (state in states.values) {
                 val elapsedMs = (now - state.startNanos) / 1_000_000.0
                 if (elapsedMs >= DASH_DURATION_MS) continue
-
-                // Only ribbon along a single line; cross-line jumps just snap.
                 if (abs(state.to.y - state.from.y) > 0.5) continue
 
-                // Head rides the caret's own easing. Tail follows the same curve, delayed,
-                // so the ribbon grows out of the start point and then eats itself from the back.
                 val tHead = (elapsedMs / caretDurationMs).coerceIn(0.0, 1.0)
                 val tTail = ((elapsedMs - TAIL_DELAY_MS) / caretDurationMs).coerceIn(0.0, 1.0)
                 if (tHead - tTail < 1e-4) continue
@@ -54,12 +54,29 @@ internal class SmoothDashCaretRenderer(
                 val y = state.from.y
 
                 ribbon.reset()
-                ribbon.moveTo(tailX, y)
-                ribbon.lineTo(tailX, y + lineHeight)
-                ribbon.lineTo(headX, y + lineHeight)
-                ribbon.lineTo(headX, y)
-                ribbon.closePath()
-                g2.fill(ribbon)
+                when (style) {
+                    TrailStyle.SOLID -> {
+                        ribbon.moveTo(tailX, y)
+                        ribbon.lineTo(tailX, y + lineHeight)
+                        ribbon.lineTo(headX, y + lineHeight)
+                        ribbon.lineTo(headX, y)
+                        ribbon.closePath()
+                        g2.color = trailColor
+                        g2.fill(ribbon)
+                    }
+                    TrailStyle.LINE -> {
+                        ribbon.moveTo(tailX, y)
+                        ribbon.lineTo(headX, y)
+                        ribbon.moveTo(tailX, y + lineHeight)
+                        ribbon.lineTo(headX, y + lineHeight)
+                        g2.color = Color(trailColor.red, trailColor.green, trailColor.blue, HALO_ALPHA)
+                        g2.stroke = HALO_STROKE
+                        g2.draw(ribbon)
+                        g2.color = trailColor
+                        g2.stroke = CORE_STROKE
+                        g2.draw(ribbon)
+                    }
+                }
             }
         } finally {
             g2.dispose()
@@ -76,6 +93,8 @@ internal class SmoothDashCaretRenderer(
 
     private companion object {
         const val TAIL_DELAY_MS = 90.0
+        const val HALO_ALPHA = 90
+        val CORE_STROKE: Stroke = BasicStroke(3.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+        val HALO_STROKE: Stroke = BasicStroke(10f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
     }
 }
-

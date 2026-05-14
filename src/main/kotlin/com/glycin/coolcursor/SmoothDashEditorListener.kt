@@ -106,14 +106,16 @@ private class Attachment(private val editor: Editor, parent: Disposable) {
     }
 
     private fun repaintState(state: SmoothDashState) {
-        val x = min(state.from.x, state.to.x).toInt() - 1
-        val y = state.from.y.toInt() - 1
-        val w = (abs(state.to.x - state.from.x) + 3).toInt()
-        val h = editor.lineHeight + 2
+        val x = min(state.from.x, state.to.x).toInt() - REPAINT_PAD
+        val y = state.from.y.toInt() - REPAINT_PAD
+        val w = (abs(state.to.x - state.from.x)).toInt() + REPAINT_PAD * 2
+        val h = editor.lineHeight + REPAINT_PAD * 2
         editor.contentComponent.repaint(x, y, w, h)
     }
 
     private companion object {
         val FRAME_INTERVAL: Duration = 16.milliseconds
+        const val REPAINT_PAD = 6
     }
 }
+
