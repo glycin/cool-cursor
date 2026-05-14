@@ -20,9 +20,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.awt.geom.Point2D
 import java.util.IdentityHashMap
 import kotlin.math.abs
-import kotlin.math.min
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -55,14 +55,20 @@ private class Attachment(private val editor: Editor, parent: Disposable) {
         editor.caretModel.addCaretListener(object : CaretListener {
             override fun caretPositionChanged(event: CaretEvent) {
                 val caret = event.caret ?: return
-                val from = editor.visualPositionToPoint2D(editor.logicalToVisualPosition(event.oldPosition))
-                val to = editor.visualPositionToPoint2D(caret.visualPosition)
-                if (abs(to.y - from.y) > 0.5 || abs(to.x - from.x) < 0.5) return
-                val state = SmoothDashState(
-                    from = from,
-                    to = to,
-                    startNanos = System.nanoTime(),
-                )
+                val rawFrom = editor.visualPositionToPoint2D(editor.logicalToVisualPosition(event.oldPosition))
+                val rawTo = editor.visualPositionToPoint2D(caret.visualPosition)
+                val half = editor.lineHeight / 2.0
+                val from = Point2D.Double(rawFrom.x, rawFrom.y + half)
+                val to = Point2D.Double(rawTo.x, rawTo.y + half)
+                if (abs(to.x - from.x) < 0.5 && abs(to.y - from.y) < 0.5) return
+
+                val dx = to.x - from.x
+                val dy = to.y - from.y
+                val midX = (from.x + to.x) / 2.0
+                val midY = (from.y + to.y) / 2.0
+                val control = Point2D.Double(midX - dy * BOW, midY + dx * BOW)
+
+                val state = SmoothDashState(from, to, control, System.nanoTime())
                 states[caret] = state
                 repaintState(state)
                 ensureRenderLoop()
@@ -106,16 +112,21 @@ private class Attachment(private val editor: Editor, parent: Disposable) {
     }
 
     private fun repaintState(state: SmoothDashState) {
-        val x = min(state.from.x, state.to.x).toInt() - REPAINT_PAD
-        val y = state.from.y.toInt() - REPAINT_PAD
-        val w = (abs(state.to.x - state.from.x)).toInt() + REPAINT_PAD * 2
-        val h = editor.lineHeight + REPAINT_PAD * 2
-        editor.contentComponent.repaint(x, y, w, h)
+        val settings = coolCursorSettings()
+        val haloHalf = if (settings.trailGlow) HALO_EXTRA / 2f else 0f
+        val pad = (settings.trailThickness / 2f + haloHalf + 2f).toInt()
+        val minX = minOf(state.from.x, state.to.x, state.control.x).toInt() - pad
+        val maxX = maxOf(state.from.x, state.to.x, state.control.x).toInt() + pad
+        val minY = minOf(state.from.y, state.to.y, state.control.y).toInt() - pad
+        val maxY = maxOf(state.from.y, state.to.y, state.control.y).toInt() + pad
+        editor.contentComponent.repaint(minX, minY, maxX - minX, maxY - minY)
     }
 
     private companion object {
         val FRAME_INTERVAL: Duration = 16.milliseconds
-        const val REPAINT_PAD = 6
+        // Control-point offset as a fraction of chord length perpendicular to the chord.
+        // 0 = straight line; ~0.3 = pronounced arc. 0.18 is a subtle swoosh.
+        const val BOW = 0.18
     }
 }
 

@@ -7,5 +7,6 @@ internal const val DASH_DURATION_MS = 240
 internal data class SmoothDashState(
     val from: Point2D,
     val to: Point2D,
+    val control: Point2D,
     val startNanos: Long,
 )

@@ -9,11 +9,13 @@ import java.awt.BasicStroke
 import java.awt.Color
 import java.awt.Graphics
 import java.awt.Graphics2D
+import java.awt.LinearGradientPaint
 import java.awt.RenderingHints
 import java.awt.Stroke
 import java.awt.geom.Path2D
-import kotlin.math.abs
 import kotlin.math.pow
+
+internal const val HALO_EXTRA = 6f
 
 internal class SmoothDashCaretRenderer(
     private val states: Map<Caret, SmoothDashState>,
@@ -21,16 +23,32 @@ internal class SmoothDashCaretRenderer(
 
     private val ribbon = Path2D.Double()
     private val caretDurationMs = Registry.intValue("editor.smooth.caret.duration", 120).coerceAtLeast(1)
-    private val curveK = Registry.doubleValue("editor.smooth.caret.curve.parametric.factor", 1.85)
+    private val easeKk = Registry.doubleValue("editor.smooth.caret.curve.parametric.factor", 1.85).coerceIn(1.1, 1.85)
+    private val easeA = 1.0 / (easeKk * 1.5 + 0.2)
+    private val easeB = easeKk * 1.5 + 0.2
 
     override fun paint(editor: Editor, highlighter: RangeHighlighter, g: Graphics) {
         if (states.isEmpty()) return
 
-        val lineHeight = editor.lineHeight.toDouble()
         val now = System.nanoTime()
         val settings = coolCursorSettings()
-        val trailColor = settings.trailColor
-        val style = settings.trailStyle
+        val headColor = settings.headColor
+        val tailColor = settings.tailColor
+        val thickness = settings.trailThickness
+        val glow = settings.trailGlow
+        val coreStroke: Stroke = BasicStroke(thickness, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+        val haloStroke: Stroke? = if (glow) {
+            BasicStroke(thickness + HALO_EXTRA, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+        } else {
+            null
+        }
+        val haloColor: Color? = if (glow) {
+            val glowColor = settings.glowColor
+            Color(glowColor.red, glowColor.green, glowColor.blue, HALO_ALPHA)
+        } else {
+            null
+        }
+        val colorsMatch = headColor.rgb24 == tailColor.rgb24
 
         val g2 = g.create() as Graphics2D
         try {
@@ -39,44 +57,49 @@ internal class SmoothDashCaretRenderer(
             for (state in states.values) {
                 val elapsedMs = (now - state.startNanos) / 1_000_000.0
                 if (elapsedMs >= DASH_DURATION_MS) continue
-                if (abs(state.to.y - state.from.y) > 0.5) continue
 
                 val tHead = (elapsedMs / caretDurationMs).coerceIn(0.0, 1.0)
                 val tTail = ((elapsedMs - TAIL_DELAY_MS) / caretDurationMs).coerceIn(0.0, 1.0)
                 if (tHead - tTail < 1e-4) continue
 
-                val headFrac = parametricEase(tHead, curveK)
-                val tailFrac = parametricEase(tTail, curveK)
+                val a = parametricEase(tTail)
+                val b = parametricEase(tHead)
 
-                val dx = state.to.x - state.from.x
-                val headX = state.from.x + dx * headFrac
-                val tailX = state.from.x + dx * tailFrac
-                val y = state.from.y
+                val p0 = state.from
+                val cp = state.control
+                val p1 = state.to
+
+                val tailX = (1 - a) * (1 - a) * p0.x + 2 * (1 - a) * a * cp.x + a * a * p1.x
+                val tailY = (1 - a) * (1 - a) * p0.y + 2 * (1 - a) * a * cp.y + a * a * p1.y
+                val headX = (1 - b) * (1 - b) * p0.x + 2 * (1 - b) * b * cp.x + b * b * p1.x
+                val headY = (1 - b) * (1 - b) * p0.y + 2 * (1 - b) * b * cp.y + b * b * p1.y
+                val subCx = (1 - a) * (1 - b) * p0.x + ((1 - a) * b + a * (1 - b)) * cp.x + a * b * p1.x
+                val subCy = (1 - a) * (1 - b) * p0.y + ((1 - a) * b + a * (1 - b)) * cp.y + a * b * p1.y
 
                 ribbon.reset()
-                when (style) {
-                    TrailStyle.SOLID -> {
-                        ribbon.moveTo(tailX, y)
-                        ribbon.lineTo(tailX, y + lineHeight)
-                        ribbon.lineTo(headX, y + lineHeight)
-                        ribbon.lineTo(headX, y)
-                        ribbon.closePath()
-                        g2.color = trailColor
-                        g2.fill(ribbon)
-                    }
-                    TrailStyle.LINE -> {
-                        ribbon.moveTo(tailX, y)
-                        ribbon.lineTo(headX, y)
-                        ribbon.moveTo(tailX, y + lineHeight)
-                        ribbon.lineTo(headX, y + lineHeight)
-                        g2.color = Color(trailColor.red, trailColor.green, trailColor.blue, HALO_ALPHA)
-                        g2.stroke = HALO_STROKE
-                        g2.draw(ribbon)
-                        g2.color = trailColor
-                        g2.stroke = CORE_STROKE
-                        g2.draw(ribbon)
-                    }
+                ribbon.moveTo(tailX, tailY)
+                ribbon.quadTo(subCx, subCy, headX, headY)
+
+                if (glow) {
+                    g2.paint = haloColor
+                    g2.stroke = haloStroke
+                    g2.draw(ribbon)
                 }
+
+                val dxLine = headX - tailX
+                val dyLine = headY - tailY
+                if (!colorsMatch && dxLine * dxLine + dyLine * dyLine >= MIN_GRADIENT_LEN_SQ) {
+                    g2.paint = LinearGradientPaint(
+                        tailX.toFloat(), tailY.toFloat(),
+                        headX.toFloat(), headY.toFloat(),
+                        GRADIENT_FRACTIONS,
+                        arrayOf(tailColor, headColor),
+                    )
+                } else {
+                    g2.paint = headColor
+                }
+                g2.stroke = coreStroke
+                g2.draw(ribbon)
             }
         } finally {
             g2.dispose()
@@ -84,17 +107,12 @@ internal class SmoothDashCaretRenderer(
     }
 
     // f(t) = 1 - (1 - t^a)^b — mirrors IntelliJ's editor.smooth.caret.curve.parametric.factor.
-    private fun parametricEase(t: Double, k: Double): Double {
-        val kk = k.coerceIn(1.1, 1.85)
-        val a = 1.0 / (kk * 1.5 + 0.2)
-        val b = kk * 1.5 + 0.2
-        return 1.0 - (1.0 - t.pow(a)).pow(b)
-    }
+    private fun parametricEase(t: Double): Double = 1.0 - (1.0 - t.pow(easeA)).pow(easeB)
 
     private companion object {
         const val TAIL_DELAY_MS = 90.0
         const val HALO_ALPHA = 90
-        val CORE_STROKE: Stroke = BasicStroke(3.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
-        val HALO_STROKE: Stroke = BasicStroke(10f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+        const val MIN_GRADIENT_LEN_SQ = 1.0
+        val GRADIENT_FRACTIONS = floatArrayOf(0f, 1f)
     }
 }
