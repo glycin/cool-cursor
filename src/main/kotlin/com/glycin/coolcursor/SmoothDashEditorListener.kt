@@ -23,6 +23,7 @@ import kotlinx.coroutines.launch
 import java.awt.geom.Point2D
 import java.util.IdentityHashMap
 import kotlin.math.abs
+import kotlin.math.sqrt
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -68,7 +69,14 @@ private class Attachment(private val editor: Editor, parent: Disposable) {
                 val midY = (from.y + to.y) / 2.0
                 val control = Point2D.Double(midX - dy * BOW, midY + dx * BOW)
 
-                val state = SmoothDashState(from, to, control, System.nanoTime())
+                val userShape = coolCursorSettings().trailShape
+                val resolved = when (userShape) {
+                    TrailShape.RANDOM -> RANDOMIZABLE_SHAPES.random()
+                    TrailShape.SINE -> if (sqrt(dx * dx + dy * dy) < SINE_THRESHOLD_PX) TrailShape.CURVE else TrailShape.SINE
+                    else -> userShape
+                }
+
+                val state = SmoothDashState(from, to, control, resolved, System.nanoTime())
                 states[caret] = state
                 repaintState(state)
                 ensureRenderLoop()
@@ -115,7 +123,8 @@ private class Attachment(private val editor: Editor, parent: Disposable) {
         val settings = coolCursorSettings()
         val haloHalf = if (settings.trailGlow) HALO_EXTRA / 2f else 0f
         val laneHalf = if (settings.lineCount > 1) editor.lineHeight / 2f else 0f
-        val pad = (settings.trailThickness / 2f + haloHalf + laneHalf + 2f).toInt()
+        val waveAmp = if (state.renderShape == TrailShape.SINE) SINE_AMPLITUDE_PX else 0f
+        val pad = (settings.trailThickness / 2f + haloHalf + laneHalf + waveAmp + 2f).toInt()
         val minX = minOf(state.from.x, state.to.x, state.control.x).toInt() - pad
         val maxX = maxOf(state.from.x, state.to.x, state.control.x).toInt() + pad
         val minY = minOf(state.from.y, state.to.y, state.control.y).toInt() - pad
@@ -128,6 +137,8 @@ private class Attachment(private val editor: Editor, parent: Disposable) {
         // Control-point offset as a fraction of chord length perpendicular to the chord.
         // 0 = straight line; ~0.3 = pronounced arc. 0.18 is a subtle swoosh.
         const val BOW = 0.18
+        const val SINE_THRESHOLD_PX = 30.0
+        val RANDOMIZABLE_SHAPES = arrayOf(TrailShape.STRAIGHT, TrailShape.CURVE, TrailShape.SINE)
     }
 }
 

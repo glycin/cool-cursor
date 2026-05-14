@@ -8,5 +8,6 @@ internal data class SmoothDashState(
     val from: Point2D,
     val to: Point2D,
     val control: Point2D,
+    val renderShape: TrailShape,
     val startNanos: Long,
 )

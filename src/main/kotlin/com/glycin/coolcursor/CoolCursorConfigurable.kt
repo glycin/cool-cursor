@@ -32,6 +32,7 @@ internal class CoolCursorConfigurable : Configurable {
     private val glowColorPanel = ColorPanel()
     private val thicknessSpinner = JSpinner(SpinnerNumberModel(DEFAULT_THICKNESS.toDouble(), 1.0, 50.0, 0.5))
     private val lineCountCombo = ComboBox(DefaultComboBoxModel(LineCountOption.entries.toTypedArray()))
+    private val trailShapeCombo = ComboBox(DefaultComboBoxModel(TrailShape.entries.toTypedArray()))
     private val glowCheckbox = JBCheckBox("Glow")
 
     override fun getDisplayName(): String = "Cool Cursor"
@@ -41,6 +42,9 @@ internal class CoolCursorConfigurable : Configurable {
         return panel {
             row("Trail thickness:") {
                 cell(thicknessSpinner)
+            }
+            row("Trail shape:") {
+                cell(trailShapeCombo)
             }
             row("Number of lines:") {
                 cell(lineCountCombo)
@@ -67,6 +71,7 @@ internal class CoolCursorConfigurable : Configurable {
             || glowColorPanel.differsFrom(s.glowColor)
             || spinnerThickness() != s.trailThickness
             || comboLineCount() != s.lineCount
+            || comboTrailShape() != s.trailShape
             || glowCheckbox.isSelected != s.trailGlow
     }
 
@@ -77,6 +82,7 @@ internal class CoolCursorConfigurable : Configurable {
         glowColorPanel.selectedColor?.let { settings.glowColor = it }
         settings.trailThickness = spinnerThickness()
         settings.lineCount = comboLineCount()
+        settings.trailShape = comboTrailShape()
         settings.trailGlow = glowCheckbox.isSelected
     }
 
@@ -91,12 +97,15 @@ internal class CoolCursorConfigurable : Configurable {
         glowColorPanel.selectedColor = s.glowColor
         thicknessSpinner.value = s.trailThickness.toDouble()
         lineCountCombo.selectedItem = LineCountOption.forCount(s.lineCount)
+        trailShapeCombo.selectedItem = s.trailShape
         glowCheckbox.isSelected = s.trailGlow
     }
 
     private fun spinnerThickness(): Float = (thicknessSpinner.value as Number).toFloat()
 
     private fun comboLineCount(): Int = (lineCountCombo.selectedItem as? LineCountOption)?.count ?: DEFAULT_LINE_COUNT
+
+    private fun comboTrailShape(): TrailShape = (trailShapeCombo.selectedItem as? TrailShape) ?: TrailShape.CURVE
 
     private fun ColorPanel.differsFrom(other: Color): Boolean {
         val rgb = selectedColor?.rgb24 ?: return false

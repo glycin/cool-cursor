@@ -13,6 +13,15 @@ internal const val DEFAULT_THICKNESS = 4f
 internal const val DEFAULT_GLOW = true
 internal const val DEFAULT_LINE_COUNT = 1
 
+internal enum class TrailShape(private val label: String) {
+    STRAIGHT("Straight"),
+    CURVE("Curve"),
+    SINE("Sin wave (long moves only)"),
+    RANDOM("Random");
+
+    override fun toString(): String = label
+}
+
 internal val Color.rgb24: Int get() = rgb and 0xFFFFFF
 
 internal fun coolCursorSettings(): CoolCursorSettings = service()
@@ -28,6 +37,7 @@ internal class CoolCursorSettings : SimplePersistentStateComponent<CoolCursorSet
         var trailThickness: Float by property(DEFAULT_THICKNESS)
         var trailGlow: Boolean by property(DEFAULT_GLOW)
         var lineCount: Int by property(DEFAULT_LINE_COUNT)
+        var trailShape: TrailShape by enum(TrailShape.CURVE)
     }
 
     @Volatile private var cachedHead: Color = Color(state.headColorRgb)
@@ -81,5 +91,11 @@ internal class CoolCursorSettings : SimplePersistentStateComponent<CoolCursorSet
         get() = state.lineCount.coerceIn(1, 3)
         set(value) {
             state.lineCount = value.coerceIn(1, 3)
+        }
+
+    var trailShape: TrailShape
+        get() = state.trailShape
+        set(value) {
+            state.trailShape = value
         }
 }

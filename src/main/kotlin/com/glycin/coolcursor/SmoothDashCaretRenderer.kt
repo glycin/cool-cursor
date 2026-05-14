@@ -14,9 +14,11 @@ import java.awt.RenderingHints
 import java.awt.Stroke
 import java.awt.geom.Path2D
 import kotlin.math.pow
+import kotlin.math.sin
 import kotlin.math.sqrt
 
 internal const val HALO_EXTRA = 6f
+internal const val SINE_AMPLITUDE_PX = 8f
 
 internal class SmoothDashCaretRenderer(
     private val states: Map<Caret, SmoothDashState>,
@@ -81,6 +83,11 @@ internal class SmoothDashCaretRenderer(
                 val chordLen = sqrt(dxC * dxC + dyC * dyC)
                 val perpX = -dyC / chordLen
                 val perpY = dxC / chordLen
+                val waveScale = if (state.renderShape == TrailShape.SINE) {
+                    chordLen * SINE_CYCLES_PER_PX * 2.0 * Math.PI
+                } else {
+                    0.0
+                }
 
                 for (off in offsets) {
                     val ox = perpX * off * offsetScale
@@ -89,16 +96,56 @@ internal class SmoothDashCaretRenderer(
                     val cpx = cp.x + ox; val cpy = cp.y + oy
                     val p1x = p1.x + ox; val p1y = p1.y + oy
 
-                    val tailX = (1 - a) * (1 - a) * p0x + 2 * (1 - a) * a * cpx + a * a * p1x
-                    val tailY = (1 - a) * (1 - a) * p0y + 2 * (1 - a) * a * cpy + a * a * p1y
-                    val headX = (1 - b) * (1 - b) * p0x + 2 * (1 - b) * b * cpx + b * b * p1x
-                    val headY = (1 - b) * (1 - b) * p0y + 2 * (1 - b) * b * cpy + b * b * p1y
-                    val subCx = (1 - a) * (1 - b) * p0x + ((1 - a) * b + a * (1 - b)) * cpx + a * b * p1x
-                    val subCy = (1 - a) * (1 - b) * p0y + ((1 - a) * b + a * (1 - b)) * cpy + a * b * p1y
+                    val gradTailX: Double; val gradTailY: Double
+                    val gradHeadX: Double; val gradHeadY: Double
 
                     ribbon.reset()
-                    ribbon.moveTo(tailX, tailY)
-                    ribbon.quadTo(subCx, subCy, headX, headY)
+                    when (state.renderShape) {
+                        TrailShape.STRAIGHT -> {
+                            val tailX = (1 - a) * p0x + a * p1x
+                            val tailY = (1 - a) * p0y + a * p1y
+                            val headX = (1 - b) * p0x + b * p1x
+                            val headY = (1 - b) * p0y + b * p1y
+                            ribbon.moveTo(tailX, tailY)
+                            ribbon.lineTo(headX, headY)
+                            gradTailX = tailX; gradTailY = tailY
+                            gradHeadX = headX; gradHeadY = headY
+                        }
+                        TrailShape.SINE -> {
+                            val span = b - a
+                            var firstX = 0.0; var firstY = 0.0
+                            var lastX = 0.0; var lastY = 0.0
+                            for (i in 0..SINE_SAMPLES) {
+                                val t = a + (i.toDouble() / SINE_SAMPLES) * span
+                                val cx = (1 - t) * p0x + t * p1x
+                                val cy = (1 - t) * p0y + t * p1y
+                                val wave = SINE_AMPLITUDE_PX * sin(waveScale * t)
+                                val x = cx + perpX * wave
+                                val y = cy + perpY * wave
+                                if (i == 0) {
+                                    ribbon.moveTo(x, y); firstX = x; firstY = y
+                                } else {
+                                    ribbon.lineTo(x, y)
+                                }
+                                lastX = x; lastY = y
+                            }
+                            gradTailX = firstX; gradTailY = firstY
+                            gradHeadX = lastX; gradHeadY = lastY
+                        }
+                        else -> {
+                            // CURVE (and any unresolved RANDOM, defensively)
+                            val tailX = (1 - a) * (1 - a) * p0x + 2 * (1 - a) * a * cpx + a * a * p1x
+                            val tailY = (1 - a) * (1 - a) * p0y + 2 * (1 - a) * a * cpy + a * a * p1y
+                            val headX = (1 - b) * (1 - b) * p0x + 2 * (1 - b) * b * cpx + b * b * p1x
+                            val headY = (1 - b) * (1 - b) * p0y + 2 * (1 - b) * b * cpy + b * b * p1y
+                            val subCx = (1 - a) * (1 - b) * p0x + ((1 - a) * b + a * (1 - b)) * cpx + a * b * p1x
+                            val subCy = (1 - a) * (1 - b) * p0y + ((1 - a) * b + a * (1 - b)) * cpy + a * b * p1y
+                            ribbon.moveTo(tailX, tailY)
+                            ribbon.quadTo(subCx, subCy, headX, headY)
+                            gradTailX = tailX; gradTailY = tailY
+                            gradHeadX = headX; gradHeadY = headY
+                        }
+                    }
 
                     if (glow) {
                         g2.paint = haloColor
@@ -106,12 +153,12 @@ internal class SmoothDashCaretRenderer(
                         g2.draw(ribbon)
                     }
 
-                    val dxLine = headX - tailX
-                    val dyLine = headY - tailY
+                    val dxLine = gradHeadX - gradTailX
+                    val dyLine = gradHeadY - gradTailY
                     if (!colorsMatch && dxLine * dxLine + dyLine * dyLine >= MIN_GRADIENT_LEN_SQ) {
                         g2.paint = LinearGradientPaint(
-                            tailX.toFloat(), tailY.toFloat(),
-                            headX.toFloat(), headY.toFloat(),
+                            gradTailX.toFloat(), gradTailY.toFloat(),
+                            gradHeadX.toFloat(), gradHeadY.toFloat(),
                             GRADIENT_FRACTIONS,
                             arrayOf(tailColor, headColor),
                         )
@@ -134,6 +181,8 @@ internal class SmoothDashCaretRenderer(
         const val TAIL_DELAY_MS = 90.0
         const val HALO_ALPHA = 90
         const val MIN_GRADIENT_LEN_SQ = 1.0
+        const val SINE_CYCLES_PER_PX = 1f / 30f
+        const val SINE_SAMPLES = 24
         val GRADIENT_FRACTIONS = floatArrayOf(0f, 1f)
         val SINGLE_OFFSETS = doubleArrayOf(0.0)
         val AKIRA_OFFSETS = doubleArrayOf(-0.5, 0.5)
