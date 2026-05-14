@@ -23,12 +23,11 @@ internal class SmoothDashCaretRenderer(
     private val ribbon = Path2D.Double()
     private val caretDurationMs = Registry.intValue("editor.smooth.caret.duration", 120).coerceAtLeast(1)
     private val easeKk = Registry.doubleValue("editor.smooth.caret.curve.parametric.factor", 1.85).coerceIn(1.1, 1.85)
-    private val easeA = 1.0 / (easeKk * 1.5 + 0.2)
-    private val easeB = easeKk * 1.5 + 0.2
+    private val easeA = 1.0 / easeKk
+    private val easeB = easeKk
 
     override fun paint(editor: Editor, highlighter: RangeHighlighter, g: Graphics) {
         if (states.isEmpty()) return
-
         val snapshot = coolCursorSettings().snapshot()
         val now = System.nanoTime()
         val coreStroke: Stroke = BasicStroke(snapshot.trailThickness, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
