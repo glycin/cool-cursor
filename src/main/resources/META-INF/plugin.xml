@@ -12,5 +12,10 @@
 
     <extensions defaultExtensionNs="com.intellij">
         <editorFactoryListener implementation="com.glycin.coolcursor.SmoothDashEditorListener"/>
+        <applicationService serviceImplementation="com.glycin.coolcursor.CoolCursorSettings"/>
+        <applicationConfigurable
+                id="com.glycin.coolcursor.settings"
+                displayName="Cool Cursor"
+                instance="com.glycin.coolcursor.CoolCursorConfigurable"/>
     </extensions>
 </idea-plugin>

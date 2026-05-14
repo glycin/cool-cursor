@@ -21,6 +21,12 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.IdentityHashMap
+import kotlin.math.abs
+import kotlin.math.min
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+
+private val ATTACHMENT_KEY = Key.create<Disposable>("cool-cursor.smoothDashAttachment")
 
 internal class SmoothDashEditorListener : EditorFactoryListener {
 
@@ -35,10 +41,6 @@ internal class SmoothDashEditorListener : EditorFactoryListener {
         val parent = event.editor.getUserData(ATTACHMENT_KEY) ?: return
         event.editor.putUserData(ATTACHMENT_KEY, null)
         Disposer.dispose(parent)
-    }
-
-    private companion object {
-        val ATTACHMENT_KEY = Key.create<Disposable>("cool-cursor.smoothDashAttachment")
     }
 }
 
@@ -55,12 +57,14 @@ private class Attachment(private val editor: Editor, parent: Disposable) {
                 val caret = event.caret ?: return
                 val from = editor.visualPositionToPoint2D(editor.logicalToVisualPosition(event.oldPosition))
                 val to = editor.visualPositionToPoint2D(caret.visualPosition)
-                states[caret] = SmoothDashState(
+                if (abs(to.y - from.y) > 0.5 || abs(to.x - from.x) < 0.5) return
+                val state = SmoothDashState(
                     from = from,
                     to = to,
                     startNanos = System.nanoTime(),
                 )
-                editor.contentComponent.repaint()
+                states[caret] = state
+                repaintState(state)
                 ensureRenderLoop()
             }
         }, parent)
@@ -88,8 +92,8 @@ private class Attachment(private val editor: Editor, parent: Disposable) {
         if (renderJob?.isActive == true) return
         renderJob = scope.launch {
             while (!pruneFinished()) {
-                delay(FRAME_INTERVAL_MS)
-                editor.contentComponent.repaint()
+                delay(FRAME_INTERVAL)
+                for (state in states.values) repaintState(state)
             }
         }
     }
@@ -101,7 +105,15 @@ private class Attachment(private val editor: Editor, parent: Disposable) {
         return states.isEmpty()
     }
 
+    private fun repaintState(state: SmoothDashState) {
+        val x = min(state.from.x, state.to.x).toInt() - 1
+        val y = state.from.y.toInt() - 1
+        val w = (abs(state.to.x - state.from.x) + 3).toInt()
+        val h = editor.lineHeight + 2
+        editor.contentComponent.repaint(x, y, w, h)
+    }
+
     private companion object {
-        const val FRAME_INTERVAL_MS = 16L
+        val FRAME_INTERVAL: Duration = 16.milliseconds
     }
 }

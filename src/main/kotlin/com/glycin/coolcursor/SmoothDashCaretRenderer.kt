@@ -5,7 +5,6 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.markup.CustomHighlighterRenderer
 import com.intellij.openapi.editor.markup.RangeHighlighter
 import com.intellij.openapi.util.registry.Registry
-import java.awt.Color
 import java.awt.Graphics
 import java.awt.Graphics2D
 import java.awt.RenderingHints
@@ -18,19 +17,20 @@ internal class SmoothDashCaretRenderer(
 ) : CustomHighlighterRenderer {
 
     private val ribbon = Path2D.Double()
+    private val caretDurationMs = Registry.intValue("editor.smooth.caret.duration", 120).coerceAtLeast(1)
+    private val curveK = Registry.doubleValue("editor.smooth.caret.curve.parametric.factor", 1.85)
 
     override fun paint(editor: Editor, highlighter: RangeHighlighter, g: Graphics) {
         if (states.isEmpty()) return
 
         val lineHeight = editor.lineHeight.toDouble()
-        val caretDurationMs = Registry.intValue("editor.smooth.caret.duration", 120).coerceAtLeast(1)
-        val curveK = Registry.doubleValue("editor.smooth.caret.curve.parametric.factor", 1.85)
         val now = System.nanoTime()
+        val trailColor = coolCursorSettings().trailColor
 
         val g2 = g.create() as Graphics2D
         try {
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-            g2.color = TRAIL
+            g2.color = trailColor
 
             for (state in states.values) {
                 val elapsedMs = (now - state.startNanos) / 1_000_000.0
@@ -76,6 +76,6 @@ internal class SmoothDashCaretRenderer(
 
     private companion object {
         const val TAIL_DELAY_MS = 90.0
-        val TRAIL = Color(0x8B, 0x5C, 0xF6)
     }
 }
+
